@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.adhaniscuber.greenlight</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <!-- Update this path after: go install -->
+        <string>/Users/YOUR_USERNAME/go/bin/greenlight</string>
+        <string>daemon</string>
+        <string>--interval</string>
+        <string>600</string>
+        <!-- Optional: hardcode repo if not running from project dir -->
+        <!-- <string>--repo</string> -->
+        <!-- <string>owner/repo</string> -->
+    </array>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>/tmp/greenlight.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/tmp/greenlight.err</string>
+
+    <!-- Run from project dir to auto-detect repo -->
+    <key>WorkingDirectory</key>
+    <string>/Users/YOUR_USERNAME/path/to/your/project</string>
+</dict>
+</plist>
