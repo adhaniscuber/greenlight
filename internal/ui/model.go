@@ -17,6 +17,12 @@ import (
 	"github.com/wirya/greenlight/pkg/history"
 )
 
+// appVersion is injected by cmd.SetVersion at startup.
+var appVersion = "dev"
+
+// SetVersion is called from cmd.SetVersion to propagate the build version into the TUI.
+func SetVersion(v string) { appVersion = v }
+
 // ── Palette ───────────────────────────────────────────────────────────────────
 
 var (
@@ -627,10 +633,18 @@ func renderTitledBox(title, content string, w int, borderCol, titleCol lipgloss.
 // renderTitleSection — Section 1: brand title, no border. Centered.
 func (m Model) renderTitleSection() string {
 	center := lipgloss.NewStyle().Width(m.width).Align(lipgloss.Center)
-	title := lipgloss.NewStyle().Foreground(colorAccent).Bold(true).
-		Padding(0, 2).Render("🚦 greenlight")
+	// ASCII art — backtick chars split via concatenation; backslashes escaped.
+	const bq = "`"
+	logo := "\n" +
+		"                                 ___       __    __\n" +
+		"     ____ _________  ___  ____  / (_)___ _/ /_  / /_\n" +
+		"🔴  / __ " + bq + "/ ___/ _ \\/ _ \\/ __ \\/ / / __ " + bq + "/ __ \\/ __/\n" +
+		"🟡 / /_/ / /  /  __/  __/ / / / / / /_/ / / / / /_\n" +
+		"🟢 \\__, /_/   \\___/\\___/_/ /_/_/_/\\__, /_/ /_/\\__/\n" +
+		"/____/                         /____/             "
+	title := lipgloss.NewStyle().Foreground(colorAccent).Bold(true).Padding(0, 2).Render(logo)
 	sub := lipgloss.NewStyle().Foreground(colorSubtle).Render("GitHub Actions deployment approvals")
-	return center.Render(title) + "\n" + center.Render(sub)
+	return center.Render(title) + "\n\n" + center.Render(sub)
 }
 
 // renderInfoContent — Section 2 content: user / role / refresh + pending summary.
@@ -875,7 +889,10 @@ func (m Model) renderHelp() string {
 	if m.activePanel == panelHistory {
 		hints = append(hints, keyHint(kb.GitHubHistory))
 	}
-	return styleHelp.Render("  " + strings.Join(hints, "  "))
+	helpStr := styleHelp.Render("  " + strings.Join(hints, "  "))
+	verStr := lipgloss.NewStyle().Foreground(colorSubtle).Render(appVersion + "  ")
+	gap := max(0, m.width-lipgloss.Width(helpStr)-lipgloss.Width(verStr))
+	return helpStr + strings.Repeat(" ", gap) + verStr
 }
 
 // ── Commands ──────────────────────────────────────────────────────────────────

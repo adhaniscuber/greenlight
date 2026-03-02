@@ -21,6 +21,10 @@ var rootCmd = &cobra.Command{
 	Short: "TUI dashboard for GitHub Actions deployment approvals",
 	Long:  `Monitor, approve, and reject GitHub Actions deployment environment approvals.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if v, _ := cmd.Flags().GetBool("version"); v {
+			fmt.Println("greenlight", appVersion)
+			return nil
+		}
 		mock, _ := cmd.Flags().GetBool("mock")
 		if mock {
 			return ui.StartMock()
@@ -359,6 +363,7 @@ var appVersion = "dev"
 // SetVersion is called from main() to inject the build-time version string.
 func SetVersion(v string) {
 	appVersion = v
+	ui.SetVersion(v)
 }
 
 var versionCmd = &cobra.Command{
@@ -380,6 +385,7 @@ func Execute() {
 
 func init() {
 	rootCmd.PersistentFlags().StringP("repo", "r", "", "GitHub repo (owner/repo)")
+	rootCmd.Flags().BoolP("version", "v", false, "Print version and exit")
 	rootCmd.Flags().Bool("mock", false, "Run with mock data (no GitHub connection needed)")
 
 	daemonCmd.Flags().IntP("interval", "i", 0, "Polling interval in seconds (default: from config)")
