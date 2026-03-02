@@ -103,8 +103,9 @@ const (
 // ── Messages ──────────────────────────────────────────────────────────────────
 
 type msgDeployments struct {
-	items []gh.PendingDeployment
-	err   error
+	items    []gh.PendingDeployment
+	warnings []string // per-repo soft errors, e.g. "voila-ggl-router: not found (404)"
+	err      error
 }
 
 type msgChangelog struct {
@@ -343,14 +344,23 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.loading = false
 		m.lastRefresh = time.Now()
 		if msg.err != nil {
+			// All repos failed — hard error, nothing to show.
 			m.setStatus("error", fmt.Sprintf("Error: %v", msg.err))
 		} else {
+			// At least one repo responded. Update the table regardless of warnings.
 			m.rawDeployments = msg.items
-			m.deployments = m.filterDeployments(msg.items)
-			m.pendingTable.SetRows(m.toTableRows(m.deployments))
-			if len(m.deployments) == 0 {
+			m.applyFilter()
+
+			switch {
+			case len(msg.warnings) > 0 && len(m.deployments) == 0:
+				// No pending items AND some repos failed — show the warning prominently.
+				m.setStatus("warn", fmt.Sprintf("⚠ %s", msg.warnings[0]))
+			case len(msg.warnings) > 0:
+				// Some pending items + some repos failed — show count with a soft note.
+				m.setStatus("warn", fmt.Sprintf("%d pending · ⚠ %d repo error(s)", len(m.deployments), len(msg.warnings)))
+			case len(m.deployments) == 0:
 				m.setStatus("success", "No pending deployments 🎉")
-			} else {
+			default:
 				m.setStatus("warn", fmt.Sprintf("%d pending deployment(s)", len(m.deployments)))
 			}
 		}
@@ -686,17 +696,38 @@ func (m Model) renderNeedApprovalContent() string {
 	return b.String()
 }
 
-// renderRepoContent — Section 4 content: list of watched repos.
+// renderRepoContent — Section 4 content: 3-column grid of watched repos.
 func (m Model) renderRepoContent() string {
 	if len(m.repos) == 0 {
 		return styleHelp.Render("No repositories. Add with: greenlight config add-repo owner/repo")
 	}
-	var parts []string
-	for _, r := range m.repos {
-		dot := lipgloss.NewStyle().Foreground(colorAccent).Render("●")
-		parts = append(parts, dot+"  "+r)
+
+	const cols = 3
+	const gap = 2 // spaces between columns
+
+	innerW := max(1, m.width-4) // matches renderTitledBox inner width
+	colW := max(20, (innerW-gap*(cols-1))/cols)
+
+	dot := lipgloss.NewStyle().Foreground(colorAccent).Render("●")
+
+	var sb strings.Builder
+	for i, r := range m.repos {
+		item := dot + " " + r
+		col := i % cols
+		isLast := i == len(m.repos)-1
+		isRowEnd := col == cols-1
+
+		if isRowEnd || isLast {
+			sb.WriteString(item)
+			if !isLast {
+				sb.WriteString("\n")
+			}
+		} else {
+			pad := max(0, colW-lipgloss.Width(item))
+			sb.WriteString(item + strings.Repeat(" ", pad+gap))
+		}
 	}
-	return strings.Join(parts, "   ")
+	return sb.String()
 }
 
 func (m Model) renderTabs() string {
@@ -859,8 +890,8 @@ func (m Model) fetchDeployments() tea.Cmd {
 	envs := m.visibleEnvs()
 	repos := m.repos
 	return func() tea.Msg {
-		items, err := gh.GetPendingApprovalsAll(repos, envs)
-		return msgDeployments{items: items, err: err}
+		items, warnings, err := gh.GetPendingApprovalsAll(repos, envs)
+		return msgDeployments{items: items, warnings: warnings, err: err}
 	}
 }
 

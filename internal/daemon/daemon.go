@@ -94,7 +94,10 @@ func Start(repos []string, interval int) error {
 }
 
 func poll(repos []string, cfg config.Config, envs []string) {
-	deployments, err := gh.GetPendingApprovalsAll(repos, envs)
+	deployments, repoWarnings, err := gh.GetPendingApprovalsAll(repos, envs)
+	for _, w := range repoWarnings {
+		log.Printf("repo warning: %s", w)
+	}
 	if err != nil {
 		log.Printf("poll error: %v", err)
 		return

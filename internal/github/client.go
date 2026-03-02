@@ -141,8 +141,14 @@ func GetPendingApprovals(repo string, allowedEnvs []string) ([]PendingDeployment
 }
 
 // GetPendingApprovalsAll polls multiple repos in parallel and merges results.
-func GetPendingApprovalsAll(repos []string, allowedEnvs []string) ([]PendingDeployment, error) {
+//
+// Returns (items, repoWarnings, error):
+//   - items:        all pending deployments collected across repos
+//   - repoWarnings: short human-readable strings for repos that failed (e.g. "voila-ggl-router: not found")
+//   - error:        non-nil only when every single repo failed (nothing to show at all)
+func GetPendingApprovalsAll(repos []string, allowedEnvs []string) ([]PendingDeployment, []string, error) {
 	type result struct {
+		repo  string
 		items []PendingDeployment
 		err   error
 	}
@@ -150,22 +156,51 @@ func GetPendingApprovalsAll(repos []string, allowedEnvs []string) ([]PendingDepl
 	for _, r := range repos {
 		go func(repo string) {
 			items, err := GetPendingApprovals(repo, allowedEnvs)
-			ch <- result{items, err}
+			ch <- result{repo, items, err}
 		}(r)
 	}
 	var all []PendingDeployment
-	var firstErr error
+	var warnings []string
+	failCount := 0
 	for range repos {
 		res := <-ch
-		if res.err != nil && firstErr == nil {
-			firstErr = res.err
+		if res.err != nil {
+			failCount++
+			warnings = append(warnings, fmt.Sprintf("%s: %s", repoShortName(res.repo), humanizeGHError(res.err)))
+		} else {
+			all = append(all, res.items...)
 		}
-		all = append(all, res.items...)
 	}
-	if len(all) == 0 && firstErr != nil {
-		return nil, firstErr
+	if failCount == len(repos) {
+		// Every repo failed — return the first warning as a hard error.
+		return nil, warnings, fmt.Errorf("%s", warnings[0])
 	}
-	return all, nil
+	return all, warnings, nil
+}
+
+// repoShortName returns the repo part of "owner/repo".
+func repoShortName(repo string) string {
+	if idx := strings.LastIndex(repo, "/"); idx != -1 {
+		return repo[idx+1:]
+	}
+	return repo
+}
+
+// humanizeGHError converts a gh CLI error into a short, readable reason.
+func humanizeGHError(err error) string {
+	msg := err.Error()
+	switch {
+	case strings.Contains(msg, "404") || strings.Contains(msg, "Not Found"):
+		return "not found (404)"
+	case strings.Contains(msg, "403") || strings.Contains(msg, "Forbidden"):
+		return "access denied (403)"
+	case strings.Contains(msg, "401") || strings.Contains(msg, "Unauthorized"):
+		return "unauthorized (401)"
+	case strings.Contains(msg, "422"):
+		return "unprocessable (422)"
+	default:
+		return "unreachable"
+	}
 }
 
 // GetChangelog fetches commits between two tags/refs
