@@ -267,6 +267,7 @@ func newModel(cfg config.Config, repos []string, mockMode bool) Model {
 
 	// Changelog viewport
 	cvp := viewport.New(80, 15)
+	cvp.SetContent("")
 
 	m := Model{
 		cfg:            cfg,
@@ -831,6 +832,9 @@ func (m Model) renderHistory() string {
 func (m Model) renderChangelogPanel() string {
 	if m.changelogRunning {
 		return fmt.Sprintf("%s Loading changelog...", m.spin.View())
+	}
+	if m.changelogTitle == "" {
+		return styleHelp.Render("  Select a pending deployment and press [c] to load its changelog.")
 	}
 	title := lipgloss.NewStyle().Foreground(colorCyan).Render(m.changelogTitle)
 	return title + "\n" + m.changelogVP.View()
