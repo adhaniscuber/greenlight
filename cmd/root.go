@@ -352,6 +352,23 @@ func truncate(s string, n int) string {
 	return s[:n-1] + "…"
 }
 
+// ── version ───────────────────────────────────────────────────────────────────
+
+var appVersion = "dev"
+
+// SetVersion is called from main() to inject the build-time version string.
+func SetVersion(v string) {
+	appVersion = v
+}
+
+var versionCmd = &cobra.Command{
+	Use:   "version",
+	Short: "Print the version of greenlight",
+	Run: func(cmd *cobra.Command, args []string) {
+		fmt.Println("greenlight", appVersion)
+	},
+}
+
 // ── Execute ───────────────────────────────────────────────────────────────────
 
 func Execute() {
@@ -379,4 +396,5 @@ func init() {
 	rootCmd.AddCommand(rejectCmd)
 	rootCmd.AddCommand(configCmd)
 	rootCmd.AddCommand(historyCmd)
+	rootCmd.AddCommand(versionCmd)
 }
